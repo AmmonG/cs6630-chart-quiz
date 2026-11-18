@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which cell fails first?</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Calibri, "Segoe UI", sans-serif;
+    background: #f4f1ea;
+    color: #1c1915;
+  }
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 28px 18px 48px;
+  }
+  h1 { font-size: 1.7rem; line-height: 1.2; margin: 0 0 12px; }
+  p { font-size: 1.05rem; line-height: 1.45; margin: 0 0 12px; }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 0;
+    border-radius: 10px;
+  }
+  .start {
+    margin-top: 18px;
+    background: #1c1915;
+    color: #fff;
+    padding: 14px 18px;
+    font-size: 1.05rem;
+  }
+  .chart {
+    width: 100%;
+    height: auto;
+    background: #fff;
+    border-radius: 12px;
+  }
+  .choices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .choices button {
+    color: #fff;
+    min-height: 64px;
+    font-size: 1.15rem;
+    font-weight: 700;
+  }
+  .score {
+    font-size: 2.4rem;
+    margin: 12px 0;
+  }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <section id="intro">
+    <h1>Which cell fails first?</h1>
+    <p>You will see two charts. On each one, pick the color of the cell that fails first.</p>
+    <p>It takes about a minute. You need to be 18 or older. No name is stored. You can close the page whenever you want.</p>
+    <p>This is a class project. The answers stay in that write-up.</p>
+    <button class="start" id="begin" type="button">I'm 18 or older. Start.</button>
+  </section>
+  <section id="trial" class="hidden">
+    <p id="prompt"><strong>Which cell fails first?</strong></p>
+    <img id="chart" class="chart" alt="Four capacity curves">
+    <div class="choices" id="choices"></div>
+  </section>
+  <section id="done" class="hidden">
+    <p>Done.</p>
+    <p class="score" id="score"></p>
+    <p>Each chart had four choices. Thanks for doing this.</p>
+  </section>
+</main>
+<script>
+const COLORS = [
+  { name: "Red", hex: "#7b241c" },
+  { name: "Blue", hex: "#1b4f72" },
+  { name: "Green", hex: "#196f3d" },
+  { name: "Orange", hex: "#b9770e" }
+];
+const CHARTS = [
+  { id: "overlay", src: "overlay.png" },
+  { id: "multiples", src: "multiples.png" }
+];
+const ANSWER = "Blue";
+
+function shuffle(list) {
+  const out = list.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = out[i];
+    out[i] = out[j];
+    out[j] = tmp;
+  }
+  return out;
+}
+
+const order = shuffle(CHARTS);
+const record = [];
+let shownAt = 0;
+let step = 0;
+let locked = false;
+
+const intro = document.getElementById("intro");
+const trial = document.getElementById("trial");
+const done = document.getElementById("done");
+const chart = document.getElementById("chart");
+const choices = document.getElementById("choices");
+
+function showTrial() {
+  locked = true;
+  const item = order[step];
+  choices.replaceChildren();
+  chart.onload = function () {
+    shownAt = performance.now();
+    locked = false;
+  };
+  chart.src = item.src;
+  shuffle(COLORS).forEach(function (color) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = color.name;
+    button.style.background = color.hex;
+    button.addEventListener("click", function () { pick(color.name); });
+    choices.appendChild(button);
+  });
+}
+
+function pick(name) {
+  if (locked) return;
+  locked = true;
+  const item = order[step];
+  record.push({
+    chart: item.id,
+    choice: name,
+    hit: name === ANSWER,
+    ms: Math.round(performance.now() - shownAt)
+  });
+  step += 1;
+  if (step < order.length) showTrial();
+  else finish();
+}
+
+function finish() {
+  trial.classList.add("hidden");
+  done.classList.remove("hidden");
+  const hits = record.filter(function (row) { return row.hit; }).length;
+  document.getElementById("score").textContent = "You got " + hits + " of 2.";
+  const payload = {
+    id: crypto.randomUUID(),
+    at: new Date().toISOString(),
+    trials: record.map(function (row) {
+      return { chart: row.chart, choice: row.choice, ms: row.ms, hit: row.hit };
+    })
+  };
+  try { localStorage.setItem("chart-quiz-last", JSON.stringify(payload)); } catch (e) {}
+  fetch("save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }).catch(function () {});
+}
+
+document.getElementById("begin").addEventListener("click", function () {
+  intro.classList.add("hidden");
+  trial.classList.remove("hidden");
+  showTrial();
+});
+</script>
+</body>
+</html>
