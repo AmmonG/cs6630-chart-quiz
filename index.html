@@ -118,11 +118,13 @@ function showTrial() {
   locked = true;
   const item = order[step];
   choices.replaceChildren();
-  chart.onload = function () {
+  function unlock() {
     shownAt = performance.now();
     locked = false;
-  };
+  }
+  chart.onload = unlock;
   chart.src = item.src;
+  if (chart.complete && chart.naturalWidth) unlock();
   shuffle(COLORS).forEach(function (color) {
     const button = document.createElement("button");
     button.type = "button";
