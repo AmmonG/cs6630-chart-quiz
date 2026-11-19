@@ -64,7 +64,7 @@
     <h1>Which cell fails first?</h1>
     <p>You will see two charts. On each one, pick the color of the cell that fails first.</p>
     <p>It takes about a minute. You need to be 18 or older. No name is stored. You can close the page whenever you want.</p>
-    <p>This is a class project. The answers stay in that write-up.</p>
+    <p>This is a class project. The color you pick and the time on each chart are stored for that write-up. No name is stored.</p>
     <button class="start" id="begin" type="button">I'm 18 or older. Start.</button>
   </section>
   <section id="trial" class="hidden">
@@ -74,8 +74,8 @@
   </section>
   <section id="done" class="hidden">
     <p>Done.</p>
-    <p class="score" id="score"></p>
-    <p>Each chart had four choices. Thanks for doing this.</p>
+    <p class="score" id="score">Saving...</p>
+    <p id="thanks" class="hidden">Each chart had four choices. Thanks for doing this.</p>
   </section>
 </main>
 <script>
@@ -89,7 +89,7 @@ const CHARTS = [
   { id: "overlay", src: "overlay.png" },
   { id: "multiples", src: "multiples.png" }
 ];
-const ANSWER = "Blue";
+const SAVE_URL = "https://attitudes-spell-offer-refuse.trycloudflare.com/save";
 
 function shuffle(list) {
   const out = list.slice();
@@ -142,7 +142,6 @@ function pick(name) {
   record.push({
     chart: item.id,
     choice: name,
-    hit: name === ANSWER,
     ms: Math.round(performance.now() - shownAt)
   });
   step += 1;
@@ -153,21 +152,19 @@ function pick(name) {
 function finish() {
   trial.classList.add("hidden");
   done.classList.remove("hidden");
-  const hits = record.filter(function (row) { return row.hit; }).length;
-  document.getElementById("score").textContent = "You got " + hits + " of 2.";
-  const payload = {
-    id: crypto.randomUUID(),
-    at: new Date().toISOString(),
-    trials: record.map(function (row) {
-      return { chart: row.chart, choice: row.choice, ms: row.ms, hit: row.hit };
-    })
-  };
-  try { localStorage.setItem("chart-quiz-last", JSON.stringify(payload)); } catch (e) {}
-  fetch("save", {
+  fetch(SAVE_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  }).catch(function () {});
+    body: JSON.stringify({ trials: record })
+  }).then(function (response) {
+    if (!response.ok) throw new Error("save failed");
+    return response.json();
+  }).then(function (data) {
+    document.getElementById("score").textContent = "You got " + data.hits + " of 2.";
+    document.getElementById("thanks").classList.remove("hidden");
+  }).catch(function () {
+    document.getElementById("score").textContent = "That answer did not save.";
+  });
 }
 
 document.getElementById("begin").addEventListener("click", function () {
