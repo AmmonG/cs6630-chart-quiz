@@ -13,48 +13,21 @@
     background: #f4f1ea;
     color: #1c1915;
   }
-  main {
-    max-width: 880px;
-    margin: 0 auto;
-    padding: 28px 18px 48px;
-  }
+  main { max-width: 880px; margin: 0 auto; padding: 28px 18px 48px; }
   h1 { font-size: 1.7rem; line-height: 1.2; margin: 0 0 12px; }
   p { font-size: 1.05rem; line-height: 1.45; margin: 0 0 12px; }
-  button {
-    font: inherit;
-    cursor: pointer;
-    border: 0;
-    border-radius: 10px;
-  }
-  .start {
-    margin-top: 18px;
-    background: #1c1915;
-    color: #fff;
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .go, .stop {
     padding: 14px 18px;
     font-size: 1.05rem;
   }
-  .chart {
-    width: 100%;
-    height: auto;
-    background: #fff;
-    border-radius: 12px;
-  }
-  .choices {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-top: 14px;
-  }
-  .choices button {
-    color: #fff;
-    min-height: 64px;
-    font-size: 1.15rem;
-    font-weight: 700;
-  }
-  .score {
-    font-size: 2.4rem;
-    margin: 12px 0;
-  }
+  .go { background: #1c1915; color: #fff; }
+  .stop { background: #fff; color: #1c1915; border: 2px solid #1c1915; }
+  .chart { width: 100%; height: auto; background: #fff; border-radius: 12px; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .choices button { color: #fff; min-height: 64px; font-size: 1.15rem; font-weight: 700; }
+  .score { font-size: 2.4rem; margin: 12px 0; }
   .hidden { display: none; }
 </style>
 </head>
@@ -62,13 +35,21 @@
 <main>
   <section id="intro">
     <h1>Which cell fails first?</h1>
-    <p>You will see two charts. On each one, pick the color of the cell that fails first.</p>
-    <p>It takes about a minute. You need to be 18 or older. No name is stored. You can close the page whenever you want.</p>
-    <p>This is a class project. The color you pick and the time on each chart are stored for that write-up. No name is stored.</p>
-    <button class="start" id="begin" type="button">I'm 18 or older. Start.</button>
+    <p>You will see six charts. On each one, pick the color of the cell that fails first.</p>
+    <p>It takes a few minutes. No name is stored. You can close the page whenever you want.</p>
+    <p>This is a class project. The color you pick and the time on each chart are stored for that write-up.</p>
+    <div class="row">
+      <button class="go" id="begin" type="button">I'm 18 or older</button>
+      <button class="stop" id="under" type="button">I'm under 18</button>
+    </div>
+  </section>
+  <section id="stopped" class="hidden">
+    <h1>This one is for ages 18 and up.</h1>
+    <p>Thanks for stopping. You can close the page.</p>
   </section>
   <section id="trial" class="hidden">
-    <p id="prompt"><strong>Which cell fails first?</strong></p>
+    <p id="count"><strong>Chart 1 of 6</strong></p>
+    <p><strong>Which cell fails first?</strong></p>
     <img id="chart" class="chart" alt="Four capacity curves">
     <div class="choices" id="choices"></div>
   </section>
@@ -79,79 +60,65 @@
   </section>
 </main>
 <script>
-const COLORS = [
+var COLORS = [
   { name: "Red", hex: "#7b241c" },
   { name: "Blue", hex: "#1b4f72" },
   { name: "Green", hex: "#196f3d" },
   { name: "Orange", hex: "#b9770e" }
 ];
-const CHARTS = [
-  { id: "overlay", src: "overlay.png" },
-  { id: "multiples", src: "multiples.png" }
-];
-const SAVE_URL = "https://attitudes-spell-offer-refuse.trycloudflare.com/save";
+var TRIALS = ["c100a", "c100b", "c250a", "c250b", "c400a", "c400b"];
+var SAVE_URL = "https://attitudes-spell-offer-refuse.trycloudflare.com/save";
 
 function shuffle(list) {
-  const out = list.slice();
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const tmp = out[i];
+  var out = list.slice();
+  for (var i = out.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = out[i];
     out[i] = out[j];
     out[j] = tmp;
   }
   return out;
 }
 
-const order = shuffle(CHARTS);
-const record = [];
-let shownAt = 0;
-let step = 0;
-let locked = false;
-
-const intro = document.getElementById("intro");
-const trial = document.getElementById("trial");
-const done = document.getElementById("done");
-const chart = document.getElementById("chart");
-const choices = document.getElementById("choices");
+var order = shuffle(TRIALS);
+var record = [];
+var shownAt = 0;
+var step = 0;
+var locked = true;
 
 function showTrial() {
   locked = true;
-  const item = order[step];
-  choices.replaceChildren();
-  function unlock() {
-    shownAt = performance.now();
-    locked = false;
-  }
+  var id = order[step];
+  document.getElementById("count").textContent = "Chart " + (step + 1) + " of " + order.length;
+  var box = document.getElementById("choices");
+  box.innerHTML = "";
+  var chart = document.getElementById("chart");
+  function unlock() { shownAt = Date.now(); locked = false; }
   chart.onload = unlock;
-  chart.src = item.src;
+  chart.src = "trials/" + id + ".png";
   if (chart.complete && chart.naturalWidth) unlock();
   shuffle(COLORS).forEach(function (color) {
-    const button = document.createElement("button");
+    var button = document.createElement("button");
     button.type = "button";
     button.textContent = color.name;
     button.style.background = color.hex;
-    button.addEventListener("click", function () { pick(color.name); });
-    choices.appendChild(button);
+    button.onclick = function () { pick(color.name); };
+    box.appendChild(button);
   });
 }
 
 function pick(name) {
   if (locked) return;
   locked = true;
-  const item = order[step];
-  record.push({
-    chart: item.id,
-    choice: name,
-    ms: Math.round(performance.now() - shownAt)
-  });
+  record.push({ id: order[step], choice: name, ms: Date.now() - shownAt });
   step += 1;
   if (step < order.length) showTrial();
   else finish();
 }
 
 function finish() {
-  trial.classList.add("hidden");
-  done.classList.remove("hidden");
+  document.getElementById("trial").className = "hidden";
+  document.getElementById("done").className = "";
   fetch(SAVE_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -160,18 +127,22 @@ function finish() {
     if (!response.ok) throw new Error("save failed");
     return response.json();
   }).then(function (data) {
-    document.getElementById("score").textContent = "You got " + data.hits + " of 2.";
-    document.getElementById("thanks").classList.remove("hidden");
+    document.getElementById("score").textContent = "You got " + data.hits + " of " + order.length + ".";
+    document.getElementById("thanks").className = "";
   }).catch(function () {
     document.getElementById("score").textContent = "That answer did not save.";
   });
 }
 
-document.getElementById("begin").addEventListener("click", function () {
-  intro.classList.add("hidden");
-  trial.classList.remove("hidden");
+document.getElementById("begin").onclick = function () {
+  document.getElementById("intro").className = "hidden";
+  document.getElementById("trial").className = "";
   showTrial();
-});
+};
+document.getElementById("under").onclick = function () {
+  document.getElementById("intro").className = "hidden";
+  document.getElementById("stopped").className = "";
+};
 </script>
 </body>
 </html>
