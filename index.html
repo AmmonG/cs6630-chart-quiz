@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Which cell fails first?</title>
+<title>Which battery?</title>
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
@@ -13,29 +13,50 @@
     background: #f4f1ea;
     color: #1c1915;
   }
-  main { max-width: 880px; margin: 0 auto; padding: 28px 18px 48px; }
-  h1 { font-size: 1.7rem; line-height: 1.2; margin: 0 0 12px; }
-  p { font-size: 1.05rem; line-height: 1.45; margin: 0 0 12px; }
-  button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; }
+  main { max-width: 860px; margin: 0 auto; padding: 22px 16px 210px; }
+  h1 { font-size: 1.7rem; line-height: 1.25; margin: 0 0 12px; }
+  p { font-size: 1.08rem; line-height: 1.45; margin: 0 0 12px; }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 12px; }
   .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-  .go, .stop {
-    padding: 14px 18px;
-    font-size: 1.05rem;
-  }
+  .go, .stop { padding: 16px 18px; font-size: 1.1rem; }
   .go { background: #1c1915; color: #fff; }
   .stop { background: #fff; color: #1c1915; border: 2px solid #1c1915; }
+  .progress { height: 8px; background: #e4dfd4; border-radius: 99px; overflow: hidden; margin: 8px 0 14px; }
+  .progress div { height: 100%; width: 0; background: #1c1915; }
+  .ask { font-size: 1.45rem; font-weight: 700; margin: 0 0 6px; }
+  .hint { color: #3d3832; }
   .chart { width: 100%; height: auto; background: #fff; border-radius: 12px; }
-  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-  .choices button { color: #fff; min-height: 64px; font-size: 1.15rem; font-weight: 700; }
-  .score { font-size: 2.4rem; margin: 12px 0; }
+  .dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #f4f1ea;
+    border-top: 1px solid #e0dbd1;
+    padding: 10px 16px 14px;
+  }
+  .dock-inner { max-width: 860px; margin: 0 auto; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .choices button {
+    color: #fff;
+    min-height: 64px;
+    font-size: 1.2rem;
+    font-weight: 700;
+  }
+  .score { font-size: 2.2rem; margin: 12px 0; }
+  .miss { background: #fff; border-radius: 12px; padding: 14px; margin: 14px 0; }
+  .miss h2 { font-size: 1.15rem; margin: 0 0 8px; }
+  .miss img { width: 100%; height: auto; border-radius: 8px; margin-top: 10px; }
   .hidden { display: none; }
 </style>
 </head>
 <body>
 <main>
   <section id="intro">
-    <h1>Which cell fails first?</h1>
-    <p>You will see twelve charts. On each one, pick the color of the cell that fails first.</p>
+    <h1>Two questions about four batteries.</h1>
+    <p>You will see twelve charts. Each chart has four batteries, shown as four colors.</p>
+    <p>Some charts ask which battery fails first. Some ask which battery lasts the longest.</p>
+    <p>Some charts show only how much charge is left. Others add extra charts that show which battery is changing faster.</p>
     <p>It takes a few minutes. No name is stored. You can close the page whenever you want.</p>
     <p>This is a class project. The color you pick and the time on each chart are stored for that write-up.</p>
     <div class="row">
@@ -48,17 +69,24 @@
     <p>Thanks for stopping. You can close the page.</p>
   </section>
   <section id="trial" class="hidden">
-    <p id="count"><strong>Chart 1 of 6</strong></p>
-    <p><strong>Which cell fails first?</strong></p>
-    <img id="chart" class="chart" alt="Four capacity curves">
-    <div class="choices" id="choices"></div>
+    <p id="count"><strong>Chart 1 of 12</strong></p>
+    <div class="progress"><div id="fill"></div></div>
+    <p class="ask" id="ask">Which battery fails first?</p>
+    <p class="hint" id="hint"></p>
+    <img id="chart" class="chart" alt="Four batteries">
   </section>
   <section id="done" class="hidden">
     <p>Done.</p>
     <p class="score" id="score">Saving...</p>
+    <div id="review"></div>
     <p id="thanks" class="hidden">Each chart had four choices. Thanks for doing this.</p>
   </section>
 </main>
+<div class="dock hidden" id="dock">
+  <div class="dock-inner">
+    <div class="choices" id="choices"></div>
+  </div>
+</div>
 <script>
 var COLORS = [
   { name: "Red", hex: "#7b241c" },
@@ -66,8 +94,20 @@ var COLORS = [
   { name: "Green", hex: "#196f3d" },
   { name: "Orange", hex: "#b9770e" }
 ];
-var TRIALS = ["c100a", "c100b", "c250a", "c250b", "c400a", "c400b", "c100a0", "c100b0", "c250a0", "c250b0", "c400a0", "c400b0"];
-var SAVE_URL = "https://iron-soviet-totals-photographers.trycloudflare.com/save";
+var TRIALS = [
+  { id: "g1", ask: "Which color fails first?", hint: "This chart shows charge left only. A higher line can still hold more charge." },
+  { id: "g2", ask: "Which color fails first?", hint: "The extra charts show an early change. A taller bar, or a deeper dip, means that battery is wearing out faster." },
+  { id: "g3", ask: "Which color fails first?", hint: "This chart shows charge left only. A higher line can still hold more charge." },
+  { id: "g4", ask: "Which color fails first?", hint: "The extra charts show an early change. A taller bar, or a deeper dip, means that battery is wearing out faster." },
+  { id: "g5", ask: "Which color fails first?", hint: "This chart shows charge left only. A higher line can still hold more charge." },
+  { id: "g6", ask: "Which color fails first?", hint: "The extra charts show an early change. A taller bar, or a deeper dip, means that battery is wearing out faster." },
+  { id: "g7", ask: "Which color lasts the longest?", hint: "This chart shows charge left only. A higher line can still hold more charge." },
+  { id: "g8", ask: "Which color lasts the longest?", hint: "The extra charts show an early change. A taller bar, or a deeper dip, means that battery is wearing out faster." },
+  { id: "g9", ask: "Which color lasts the longest?", hint: "This chart shows charge left only. A higher line can still hold more charge." },
+  { id: "g10", ask: "Which color lasts the longest?", hint: "The extra charts show an early change. A taller bar, or a deeper dip, means that battery is wearing out faster." },
+  { id: "g11", ask: "Which color lasts the longest?", hint: "This chart shows charge left only. A higher line can still hold more charge." },
+  { id: "g12", ask: "Which color lasts the longest?", hint: "The extra charts show an early change. A taller bar, or a deeper dip, means that battery is wearing out faster." }
+];
 
 function shuffle(list) {
   var out = list.slice();
@@ -88,15 +128,20 @@ var locked = true;
 
 function showTrial() {
   locked = true;
-  var id = order[step];
+  var item = order[step];
   document.getElementById("count").textContent = "Chart " + (step + 1) + " of " + order.length;
+  document.getElementById("fill").style.width = ((step + 1) / order.length * 100) + "%";
+  document.getElementById("ask").textContent = item.ask;
+  document.getElementById("hint").textContent = item.hint;
   var box = document.getElementById("choices");
   box.innerHTML = "";
   var chart = document.getElementById("chart");
   function unlock() { shownAt = Date.now(); locked = false; }
   chart.onload = unlock;
-  chart.src = "trials/" + id + ".png";
+  chart.alt = item.ask;
+  chart.src = "trials/" + item.id + ".png?v=2";
   if (chart.complete && chart.naturalWidth) unlock();
+  window.scrollTo(0, 0);
   shuffle(COLORS).forEach(function (color) {
     var button = document.createElement("button");
     button.type = "button";
@@ -110,7 +155,7 @@ function showTrial() {
 function pick(name) {
   if (locked) return;
   locked = true;
-  record.push({ id: order[step], choice: name, ms: Date.now() - shownAt });
+  record.push({ id: order[step].id, choice: name, ms: Date.now() - shownAt });
   step += 1;
   if (step < order.length) showTrial();
   else finish();
@@ -118,16 +163,45 @@ function pick(name) {
 
 function finish() {
   document.getElementById("trial").className = "hidden";
+  document.getElementById("dock").className = "hidden";
   document.getElementById("done").className = "";
-  fetch(SAVE_URL, {
+  fetch("https://iron-soviet-totals-photographers.trycloudflare.com/save", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ trials: record })
+    body: JSON.stringify({ version: "graduate", trials: record })
   }).then(function (response) {
     if (!response.ok) throw new Error("save failed");
     return response.json();
   }).then(function (data) {
     document.getElementById("score").textContent = "You got " + data.hits + " of " + order.length + ".";
+    var box = document.getElementById("review");
+    var misses = (data.results || []).filter(function (row) { return !row.hit; });
+    if (!misses.length) {
+      var fine = document.createElement("p");
+      fine.textContent = "Nothing to correct. The charge line by itself can point at the wrong battery. The taller bar is the one wearing out faster.";
+      box.appendChild(fine);
+    } else {
+      var lead = document.createElement("p");
+      lead.textContent = misses.length === 1 ? "Here is the one to look at again." : "Here are the ones to look at again.";
+      box.appendChild(lead);
+      misses.forEach(function (row) {
+        var seen = order.filter(function (item) { return item.id === row.id; })[0];
+        var number = order.indexOf(seen) + 1;
+        var card = document.createElement("div");
+        card.className = "miss";
+        var title = document.createElement("h2");
+        title.textContent = "Chart " + number + ". " + row.ask;
+        var why = document.createElement("p");
+        why.textContent = row.why;
+        var img = document.createElement("img");
+        img.src = "trials/" + row.id + ".png?v=2";
+        img.alt = row.ask;
+        card.appendChild(title);
+        card.appendChild(why);
+        card.appendChild(img);
+        box.appendChild(card);
+      });
+    }
     document.getElementById("thanks").className = "";
   }).catch(function () {
     document.getElementById("score").textContent = "That answer did not save.";
@@ -137,6 +211,7 @@ function finish() {
 document.getElementById("begin").onclick = function () {
   document.getElementById("intro").className = "hidden";
   document.getElementById("trial").className = "";
+  document.getElementById("dock").className = "dock";
   showTrial();
 };
 document.getElementById("under").onclick = function () {
@@ -146,3 +221,4 @@ document.getElementById("under").onclick = function () {
 </script>
 </body>
 </html>
+
