@@ -139,7 +139,7 @@ function showTrial() {
   function unlock() { shownAt = Date.now(); locked = false; }
   chart.onload = unlock;
   chart.alt = item.ask;
-  chart.src = "trials/" + item.id + ".png?v=2";
+  chart.src = "trials/" + item.id + ".png?v=3";
   if (chart.complete && chart.naturalWidth) unlock();
   window.scrollTo(0, 0);
   shuffle(COLORS).forEach(function (color) {
@@ -194,7 +194,7 @@ function finish() {
         var why = document.createElement("p");
         why.textContent = row.why;
         var img = document.createElement("img");
-        img.src = "trials/" + row.id + ".png?v=2";
+        img.src = "trials/" + row.id + ".png?v=3";
         img.alt = row.ask;
         card.appendChild(title);
         card.appendChild(why);
@@ -221,4 +221,3 @@ document.getElementById("under").onclick = function () {
 </script>
 </body>
 </html>
-
